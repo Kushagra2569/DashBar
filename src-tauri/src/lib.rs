@@ -1,10 +1,9 @@
 use serde::Serialize;
-use std::path::PathBuf;
+use tauri::Manager;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use walkdir::WalkDir;
 
@@ -23,15 +22,28 @@ fn search_apps(query: &str) -> Vec<AppInfo> {
     // Common Start Menu paths
     let paths = vec![
         r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
-        r"C:\Users\kusha\AppData\Roaming\Microsoft\Windows\Start Menu\Programs", // TODO: dynamic user path?
+        r"C:\Users\kusha\AppData\Roaming\Microsoft\Windows\Start Menu\Programs",
+        r"C:\Windows\System32", // For built-in tools like notepad, calc
     ];
 
     for path in paths {
-        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            if entry.path().extension().and_then(|s| s.to_str()) == Some("lnk") {
+        println!("Checking path: {}", path);
+        for entry in WalkDir::new(path)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let extension = entry
+                .path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            if extension == "lnk" || extension == "exe" {
                 let file_name = entry.file_name().to_string_lossy().to_string();
+                // println!("Checking file: {}", file_name); // excessive logging
                 if file_name.to_lowercase().contains(&query) {
-                    let name = file_name.replace(".lnk", "");
+                    println!("Found match: {}", file_name);
+                    let name = file_name.replace(".lnk", "").replace(".exe", "");
                     // For now, we just invoke the lnk itself
                     apps.push(AppInfo {
                         name,
